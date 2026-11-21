@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="Micro Moves">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2343d6">
+<title>Micro Moves</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a pack-opening game for tiny workouts. Loud, bouncy, never preachy.
+   IDEA: a trading card table. Tap to ante time, the pack shakes, the card bursts open.
+   PICTURE: the card itself, framed by its tier: Base, Foil, Gold, Holo, Prism.
+   COLOUR and TYPE: cobalt table, white cards, sunflower action, tier metals. Rubik 900 + Rubik.
+   LAYOUT: one phone column, card on top, thumb button below, tab bar at the bottom. */
+@property --a{syntax:'<angle>';inherits:false;initial-value:0deg}
+:root{color-scheme:light dark;
+--bg:light-dark(#2343d6,#0f1747);--bg2:light-dark(#1b35b4,#0a1036);
+--card:light-dark(#fff,#1a2257);--ink:light-dark(#151a3d,#eef0ff);--muted:light-dark(#5b6189,#a9b0e0);
+--line:light-dark(#e3e6f5,#2c357a);--chipbg:light-dark(#eef0fb,#252e6b);--sun:#ffcd2e;--sunInk:#241a00;--on:#fff;--soft:rgba(255,255,255,.14)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--on);font:16px/1.5 Rubik,system-ui,sans-serif;overflow-x:clip;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+body{background:radial-gradient(120% 60% at 50% 22%,light-dark(#3a5bff,#1c2a7a),var(--bg) 70%) fixed}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;touch-action:manipulation}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.app{max-width:520px;margin:0 auto;padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 100px max(16px,env(safe-area-inset-left));min-height:100vh}
+header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+h1{font-weight:900;font-size:22px;margin:0 auto 0 0;letter-spacing:-.01em}
+h2{font-weight:900;font-size:32px;line-height:1.05;margin:4px 0 12px;text-wrap:balance}
+h3{font-size:17px;margin:20px 0 8px}
+.since{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:8px 16px;margin-bottom:10px;border-radius:16px;background:var(--soft);transition:background .4s,color .4s}
+.since .sl{font-size:15px;font-weight:500}
+.since b{white-space:nowrap;font-weight:900;font-size:24px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.since.idle b{font-size:16px;font-weight:700;opacity:.85}
+.since.warm{background:var(--sun);color:var(--sunInk)}
+.since.bump{animation:pop .5s cubic-bezier(.3,1.8,.5,1)}
+.view{display:none}.view.on{display:block}
+.hbtn{min-height:40px;min-width:40px;border-radius:999px;background:var(--soft);display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 12px;font-weight:800}
+.hbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.streak.lit{background:var(--sun);color:var(--sunInk)}
+.streak.lit svg{fill:#ff7a1a;stroke:#b33f00}
+.streak.pop{animation:pop .6s cubic-bezier(.3,1.8,.5,1)}
+/* stage */
+.stage{position:relative;display:grid;place-items:center;margin:4px 0 16px;perspective:1200px}
+.stage::before{content:"";position:absolute;inset:-10% -20%;background:radial-gradient(closest-side,var(--glow,#fff),transparent);opacity:0;transition:opacity .3s;pointer-events:none}
+.stage.charging::before{opacity:.55;animation:pulse .25s ease-in-out infinite alternate}
+.bouncer{width:min(100%,320px);aspect-ratio:5/7;max-height:54vh;position:relative}
+.bouncer.pop{animation:pop .32s cubic-bezier(.3,1.8,.5,1)}
+.bouncer.shake{animation:shake .09s linear infinite}
+.bouncer.collect{animation:collect .42s cubic-bezier(.5,0,.8,.4) forwards}
+.tilt{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateX(var(--ry,0deg)) rotateY(var(--rx,0deg));transition:transform .12s ease-out}
+.card{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.25,1.5,.45,1)}
+.card.up{transform:rotateY(180deg)}
+.card.fast{transition-duration:.2s}
+.back{transition:visibility 0s .2s}.card.up .back{visibility:hidden}
+.front{visibility:hidden;transition:visibility 0s .2s}.card.up .front{visibility:visible}
+.card.fast .back,.card.fast .front{transition-delay:.08s}
+.face{position:absolute;inset:0;border-radius:22px;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.back{background:#fff;padding:10px;box-shadow:0 18px 40px rgba(0,0,30,.4)}
+.stage.charging .back{box-shadow:0 0 0 4px var(--glow),0 0 50px 12px var(--glow)}
+.back .lat{height:100%;border-radius:14px;display:grid;place-items:center;position:relative;overflow:hidden;background:
+repeating-linear-gradient(45deg,transparent 0 14px,rgba(255,255,255,.2) 14px 16px),repeating-linear-gradient(-45deg,transparent 0 14px,rgba(255,255,255,.2) 14px 16px),radial-gradient(circle at 50% 45%,#3d5cff,#13208c)}
+.lat::after{content:"";position:absolute;inset:-50%;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.35) 50%,transparent 60%);animation:sweep 3.2s ease-in-out infinite}
+.emb{position:absolute;top:18px;left:0;right:0;text-align:center;font-weight:900;font-size:14px;letter-spacing:.02em;color:rgba(255,255,255,.75)}
+.pill{position:relative;z-index:1;background:#fff;color:#151a3d;border-radius:999px;padding:10px 26px;font-weight:900;font-size:clamp(42px,13vw,60px);line-height:1;box-shadow:0 6px 0 var(--sun);font-variant-numeric:tabular-nums}
+.pill.bump{animation:pop .25s cubic-bezier(.3,2,.5,1)}
+.pill.empty{font-size:20px;font-weight:700;padding:12px 20px;box-shadow:0 4px 0 var(--sun)}
+.front{transform:rotateY(180deg);box-shadow:0 18px 40px rgba(0,0,30,.4)}
+/* card face (shared) */
+.cf{position:relative;height:100%;border-radius:22px;padding:6px;background:var(--frame);overflow:hidden}
+.inner{position:relative;height:100%;border-radius:17px;background:var(--card);color:var(--ink);display:flex;flex-direction:column;padding:12px;gap:6px;overflow:hidden}
+.ttl{display:flex;align-items:center;gap:8px}
+.ttl .nm{flex:1;font-weight:900;font-size:21px;line-height:1.1}
+.gem{font-size:12px;font-weight:800;padding:3px 9px;border-radius:999px;background:var(--frame);color:#151a3d;white-space:nowrap}
+.art{position:relative;flex:1 1 auto;min-height:72px;border-radius:12px;overflow:hidden;display:grid;place-items:center;
+background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.12) 0 10deg,transparent 10deg 20deg),radial-gradient(circle at 50% 45%,hsl(var(--h) 95% 68%),hsl(var(--h) 80% 40%) 75%)}
+.art svg{width:42%;max-width:110px;height:auto;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 3px 0 rgba(0,0,0,.25));position:relative;z-index:1}
+.big{font-weight:900;font-size:clamp(32px,9.5vw,42px);line-height:1;color:var(--bg);font-variant-numeric:tabular-nums}
+:root[data-theme=dark] .big{color:var(--sun)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .big{color:var(--sun)}}
+.cue{font-size:15px;line-height:1.35;margin:0}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}
+.howto{min-height:36px;padding:0 12px;border-radius:999px;background:var(--chipbg);color:var(--ink);font-weight:700;font-size:14px}
+.from{font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}
+.from b{color:var(--ink)}
+/* tiers */
+.t0{--frame:light-dark(#dfe3f6,#3a4590)}
+.t1{--frame:linear-gradient(135deg,#f6f7ff,#a3abc6 28%,#ffffff 50%,#8c95b0 72%,#eef0ff)}
+.t2{--frame:linear-gradient(135deg,#fff2a8,#d39a13 28%,#fff8d6 50%,#b07208 72%,#ffe27a)}
+.t3{--frame:linear-gradient(135deg,#ffc6ee,#9fe9ff 25%,#d2ffb8 50%,#fff0a0 75%,#ffbde0);background-size:300% 300%;animation:drift 5s linear infinite}
+.t4{--frame:conic-gradient(from var(--a),#ff5f6d,#ffc371,#47e891,#40c4ff,#b388ff,#ff5f6d);animation:spin 3s linear infinite}
+.t1 .inner::after,.t2 .inner::after,.t3 .inner::after,.t4 .inner::after{content:"";position:absolute;inset:-40%;background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.55) 50%,transparent 58%);pointer-events:none;animation:sweep 3.6s ease-in-out infinite;z-index:3}
+.t3 .art::after,.t4 .art::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 15%,rgba(255,0,170,.55) 32%,rgba(0,240,255,.55) 45%,rgba(255,255,0,.55) 58%,rgba(120,255,120,.5) 70%,transparent 85%);background-size:250% 250%;mix-blend-mode:color-dodge;animation:drift 3.5s linear infinite}
+.t4 .inner{background:linear-gradient(160deg,var(--card) 60%,light-dark(#f4ecff,#2a2470))}
+.cf::before{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;border-radius:inherit;background:radial-gradient(circle at var(--mx,50%) var(--my,30%),rgba(255,255,255,.45),transparent 45%);mix-blend-mode:overlay;opacity:0;transition:opacity .3s}
+.t1::before,.t2::before,.t3::before,.t4::before{opacity:1}
+.t3 .art::before,.t4 .art::before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 9 -6.2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");background-size:160px;background-position:calc(var(--mx,50%) * .4) calc(var(--my,50%) * .4);mix-blend-mode:overlay;opacity:.85}
+.tilting .t1 .inner::after,.tilting .t2 .inner::after,.tilting .t3 .inner::after,.tilting .t4 .inner::after{animation:none;transform:translateX(calc((var(--mxn,0) - .5) * 120%))}
+.tilting .t3 .art::after,.tilting .t4 .art::after{animation:none;background-position:var(--mx,50%) var(--my,50%)}
+.spk{position:absolute;width:10px;height:10px;z-index:2;background:#fff;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);animation:twinkle 1.6s ease-in-out infinite}
+/* thumb button */
+.tap{position:relative;display:block;width:100%;height:96px;border-radius:26px;background:linear-gradient(#ffe066,var(--sun));color:var(--sunInk);font-weight:900;font-size:32px;box-shadow:0 7px 0 #c99a00,0 14px 24px rgba(0,0,40,.3);transition:transform .06s,box-shadow .06s}
+.tap:active{transform:translateY(5px) scale(.98);box-shadow:0 2px 0 #c99a00}
+.float{position:fixed;z-index:50;pointer-events:none;font-weight:900;font-size:24px;color:#fff;text-shadow:0 2px 0 rgba(0,0,40,.4);animation:floatUp .7s ease-out forwards}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 0}
+.btn{min-height:52px;border-radius:16px;padding:10px 16px;font-weight:800;background:var(--soft);color:var(--on);transition:transform .08s}
+.btn:active,.chip:active,.howto:active,.hbtn:active{transform:scale(.95)}
+.btn.pri{background:linear-gradient(#ffe066,var(--sun));color:var(--sunInk);box-shadow:0 4px 0 #c99a00}
+.btn.sm{min-height:44px;font-size:15px;padding:8px 12px}
+.tbtn{position:relative;overflow:hidden;width:100%;min-height:58px;margin-bottom:10px;border-radius:18px;border:2.5px solid var(--sun);color:#fff;font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(255,205,46,.12);transition:transform .08s}
+.tbtn:active{transform:scale(.97)}
+.tbtn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;position:relative}
+.tbtn span{position:relative;font-variant-numeric:tabular-nums}
+.tbtn .fill{position:absolute;inset:0 auto 0 0;width:var(--p,0%);background:var(--sun);transition:width .25s linear}
+.tbtn.run{color:var(--sunInk)}.tbtn.run.half{color:var(--sunInk)}
+.tbtn.run:not(.half){color:#fff}
+.link{color:#fff;text-decoration:underline;min-height:44px;font-size:15px;padding:0 4px}
+.hint{text-align:center;color:rgba(255,255,255,.82);font-size:15px;margin:12px 0 0}
+.panel{background:var(--card);color:var(--ink);border-radius:20px;padding:16px;margin-bottom:12px}
+.muted{color:var(--muted)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{min-height:44px;padding:8px 14px;border-radius:999px;background:var(--chipbg);color:var(--ink);font-weight:500}
+.chip.on{background:var(--sun);color:var(--sunInk);font-weight:800}
+.clock{font-weight:900;font-size:clamp(64px,22vw,96px);line-height:1;text-align:center;font-variant-numeric:tabular-nums;margin:10px 0 4px}
+.phase{text-align:center;font-weight:800;color:var(--bg);font-size:17px}
+.prompt{font-weight:900;font-size:28px;line-height:1.15;text-wrap:balance;margin:6px 0 12px}
+.tag{font-size:13px;font-weight:500;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.stat{background:var(--card);color:var(--ink);border-radius:16px;padding:12px}
+.stat b{display:block;font-size:30px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--muted)}
+.stat.hot{background:var(--sun);color:var(--sunInk)}.stat.hot span{color:var(--sunInk)}
+.bars{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:4px;align-items:end;height:90px}
+.bars i{display:block;background:var(--bg);border-radius:4px 4px 2px 2px;min-height:3px}
+.bars i.z{background:var(--line)}
+.bl{display:flex;justify-content:space-between;font-size:13px;margin-top:6px}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.list li:last-child{border:0}
+.list .t{flex:1}
+.list .t small{display:block;color:var(--muted);font-size:13px}
+.x{min-width:44px;min-height:44px;border-radius:12px;color:var(--muted);font-size:20px}
+.sw{appearance:none;-webkit-appearance:none;width:50px;height:30px;border-radius:99px;background:var(--line);position:relative;flex:none;cursor:pointer;transition:background .2s;margin:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw:checked{background:var(--bg)}.sw:checked::after{left:23px}
+label.f{display:block;font-size:14px;font-weight:500;margin:10px 0 4px}
+.in{width:100%;min-height:46px;font-size:16px;border-radius:12px;border:2px solid var(--line);background:transparent;padding:8px 12px;color:var(--ink)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.panel .btn{background:var(--chipbg);color:var(--ink)}
+.panel .btn.pri{background:linear-gradient(#ffe066,var(--sun));color:var(--sunInk)}
+.banner{background:var(--sun);color:var(--sunInk);border-radius:16px;padding:12px 14px;margin-bottom:12px;display:none}
+.banner.on{display:block;animation:pop .4s cubic-bezier(.3,1.8,.5,1)}
+.banner p{margin:0 0 8px;font-weight:800}
+.banner .btn{background:rgba(0,0,0,.1);color:var(--sunInk);min-height:44px}
+/* collection */
+.ladder{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ladder span{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--frame);color:#151a3d}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.mini{display:block;text-align:left;padding:0;border-radius:18px;aspect-ratio:5/6;box-shadow:0 8px 18px rgba(0,0,40,.3);transition:transform .1s}
+.mini .cf{border-radius:18px;padding:4px}
+.mini .inner{border-radius:14px;padding:8px;gap:5px}
+.mini .nm{font-weight:900;font-size:15px;line-height:1.15}
+.mini .art{min-height:50px;border-radius:9px}
+.mini .art svg{width:46%}
+.mini .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-weight:500}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--frame);background-size:100% 100%}
+.mini.off{opacity:.45}
+/* overlays */
+.scrim{position:fixed;inset:0;background:rgba(0,0,20,.55);display:none;align-items:flex-end;justify-content:center;z-index:30}
+.scrim.on{display:flex}
+.sheet{background:var(--card);color:var(--ink);width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:24px 24px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));animation:rise .3s cubic-bezier(.3,1.4,.5,1)}
+.sheet h2{font-size:26px}
+.steps{padding-left:22px;margin:8px 0 12px}
+.steps li{margin-bottom:8px;padding-left:4px}
+.steps li::marker{font-weight:900;color:var(--bg)}
+.note{background:var(--chipbg);border-radius:12px;padding:10px 12px;font-size:15px;margin:0 0 8px}
+.prev{width:min(100%,230px);aspect-ratio:5/7;margin:0 auto 14px}
+.upg{position:fixed;inset:0;z-index:35;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:radial-gradient(circle at 50% 45%,rgba(40,60,220,.92),rgba(5,10,50,.96))}
+.upg.on{display:flex}
+.upg .prev{width:min(78vw,280px);margin:0;animation:upgIn .8s cubic-bezier(.25,1.6,.45,1)}
+.upg .lbl{font-weight:900;font-size:clamp(30px,9vw,44px);line-height:1;text-align:center;color:#fff;animation:pop .6s .3s cubic-bezier(.3,1.8,.5,1) both}
+.upg .sub2{color:rgba(255,255,255,.85);text-align:center;margin:0}
+.upg .btn{min-width:200px;flex:none}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:45}
+#flash.go{animation:flash .45s ease-out}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+.toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,20px);background:#151a3d;color:#fff;padding:10px 18px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none;z-index:55;white-space:nowrap;font-weight:500}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--bg2);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:20}
+nav div{display:flex;width:100%;max-width:520px}
+nav button{flex:1;min-height:64px;color:rgba(255,255,255,.65);font-size:12px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+nav button.on{color:var(--sun)}
+nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dot{display:inline-block;min-width:18px;height:18px;border-radius:9px;background:var(--sun);color:var(--sunInk);font-size:11px;font-weight:800;line-height:18px;padding:0 5px;margin-left:2px}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes shake{0%{transform:translate(0,0) rotate(0)}25%{transform:translate(-3px,1px) rotate(-1.5deg)}50%{transform:translate(2px,-2px) rotate(1deg)}75%{transform:translate(-1px,2px) rotate(-.5deg)}100%{transform:translate(0,0) rotate(0)}}
+@keyframes collect{to{transform:translateY(-55vh) scale(.3) rotate(-8deg);opacity:0}}
+@keyframes sweep{0%,55%{transform:translateX(-60%)}100%{transform:translateX(60%)}}
+@keyframes drift{to{background-position:250% 250%}}
+@keyframes spin{to{--a:360deg}}
+@keyframes twinkle{0%,100%{transform:scale(.2);opacity:0}50%{transform:scale(1);opacity:1}}
+@keyframes pulse{to{transform:scale(1.06)}}
+@keyframes floatUp{from{transform:translate(-50%,0) scale(.8);opacity:1}to{transform:translate(-50%,-70px) scale(1.2);opacity:0}}
+@keyframes rise{from{transform:translateY(40px);opacity:.4}}
+@keyframes upgIn{0%{transform:scale(.4) rotateY(180deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes flash{0%{opacity:.85}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas><div id="flash"></div>
+<div class="app">
+<header><h1>Micro Moves</h1>
+<button class="hbtn streak" id="streakBtn" aria-label="Streak"><svg viewBox="0 0 24 24"><path d="M12 2c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-5 1-8.5z"/></svg><b id="streakN">0</b></button>
+<button class="hbtn" id="muteBtn" aria-label="Sound"></button>
+</header>
+
+<div class="since idle" id="since" role="timer" aria-live="off"><span class="sl" id="sinceLbl">Since your last move</span><b id="sinceT">No moves yet</b></div>
+<div class="banner" id="nudge"><p id="nudgeTxt"></p><div class="row"><button class="btn" id="nudgeGo">Draw a card</button><button class="btn" id="nudgeSnooze">Snooze 30 min</button></div></div>
+
+<section class="view on" id="v-draw">
+<div class="stage" id="stage"><div class="bouncer" id="bouncer"><div class="tilt" id="tilt"><div class="card" id="card">
+<div class="face back"><div class="lat"><div class="emb">QUICK DRAW</div><div class="pill empty" id="pill">Tap to deal</div></div></div>
+<div class="face front" id="front"></div>
+</div></div></div></div>
+<div id="drawCtl"><button class="tap" id="tap">+30s</button><p class="hint" id="drawHint">One tap for every 30 seconds you've got. The card opens by itself.</p></div>
+<div id="revealCtl" hidden>
+<button class="tbtn" id="miniTimer"><i class="fill"></i><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M10 2h4"/></svg><span id="miniLbl">Start timer</span></button>
+<div class="row"><button class="btn pri" id="done">Done</button><button class="btn" id="redraw">Redraw</button></div>
+<div style="text-align:center;margin-top:4px"><button class="link" id="newDraw">New draw</button></div>
+</div>
+</section>
+
+<section class="view" id="v-focus">
+<div class="panel">
+<div class="phase" id="fPhase">Focus</div>
+<div class="clock" id="fClock">25:00</div>
+<p class="muted" id="fNote" style="text-align:center;margin:0 0 12px;min-height:24px"></p>
+<div class="row"><button class="btn pri" id="fGo">Start</button><button class="btn" id="fSkip">Skip</button><button class="btn" id="fReset">Reset</button></div>
+</div>
+<div class="panel" id="fBreak" hidden>
+<p style="margin:0 0 10px;font-weight:800">Break time. Move a little?</p>
+<div class="row"><button class="btn pri" id="fDraw">Draw a card</button><button class="btn" id="fWalk">Walk on this</button></div>
+</div>
+<div class="panel">
+<label class="f" style="margin-top:0">Focus length</label><div class="chips" id="fLen"></div>
+<label class="f">Break length</label><div class="chips" id="bLen"></div>
+</div>
+</section>
+
+<section class="view" id="v-walk">
+<h2>Walk on this</h2>
+<div class="panel">
+<div class="tag">Take this with you (optional)</div>
+<p class="prompt" id="wPrompt"></p>
+<div class="row"><button class="btn sm" id="wNext">Another prompt</button><button class="btn sm" id="wNone">No prompt</button></div>
+</div>
+<div class="panel" id="wSetup">
+<label class="f" style="margin-top:0">How long?</label><div class="chips" id="wLen"></div>
+<div style="margin-top:14px"><button class="btn pri" id="wStart" style="width:100%">Start walk</button></div>
+</div>
+<div class="panel" id="wRun" hidden>
+<div class="phase">Walking</div>
+<div class="clock" id="wClock">0:00</div>
+<p class="muted" id="wNote" style="text-align:center;margin:0 0 12px"></p>
+<div class="row"><button class="btn pri" id="wBack">I'm back</button><button class="btn" id="wCancel">Cancel</button></div>
+</div>
+<div class="panel" id="wResume" hidden>
+<p style="margin:0 0 10px;font-weight:800">Walk logged. Your focus timer is paused.</p>
+<div class="row"><button class="btn pri" id="wResumeGo">Resume focus</button><button class="btn" id="wResumeNo">Not yet</button></div>
+</div>
+</section>
+
+<section class="view" id="v-deck">
+<h2>Collection</h2>
+<div class="panel" id="owedBox" hidden><h3 style="margin-top:0">Shout-outs owed</h3><ul class="list" id="owedList"></ul></div>
+<div class="panel"><div id="colSum" style="font-weight:800"></div>
+<div class="ladder"><span class="t0">Base</span><span class="t1">Foil · 3</span><span class="t2">Gold · 8</span><span class="t3">Holo · 15</span><span class="t4">Prism · 30</span></div>
+<p class="muted" style="font-size:14px;margin:8px 0 0">Finish a card that many times to upgrade it. Tap a card for steps and settings.</p></div>
+<div class="grid" id="grid"></div>
+<div class="panel">
+<h3 style="margin-top:0" id="formTitle">Add a friend's card</h3>
+<form id="cardForm">
+<label class="f" for="cName">Activity</label><input class="in" id="cName" required maxlength="60" placeholder="Shadowbox to the end of the ad">
+<label class="f" for="cCue">One-line cue</label><input class="in" id="cCue" maxlength="120" placeholder="Fists up, light on your feet">
+<label class="f" for="cSteps">Steps, one per line</label><textarea class="in" id="cSteps" rows="4" placeholder="Stand with feet shoulder-width apart"></textarea>
+<label class="f">Type</label><div class="chips" id="cKind"><button type="button" class="chip on" data-k="time">Timed</button><button type="button" class="chip" data-k="reps">Reps</button></div>
+<div class="two" id="repFields" hidden>
+<div><label class="f" for="cPer">Reps per 30s</label><input class="in" id="cPer" type="number" min="1" max="50" value="5"></div>
+<div><label class="f" for="cCap">Max reps</label><input class="in" id="cCap" type="number" min="1" max="200" value="25"></div>
+</div>
+<label class="f" for="cMin">Needs at least</label>
+<select class="in" id="cMin"><option value="0">Any time</option><option value="60">1:00</option><option value="90">1:30</option><option value="120">2:00</option><option value="180">3:00</option><option value="300">5:00</option></select>
+<div class="two">
+<div><label class="f" for="cFrom">From</label><input class="in" id="cFrom" maxlength="40" placeholder="Friend's name"></div>
+<div><label class="f" for="cContact">Reach them at</label><input class="in" id="cContact" maxlength="120" placeholder="@handle or link"></div>
+</div>
+<div class="row" style="margin-top:14px"><button class="btn pri" type="submit" id="cSave">Add to deck</button><button class="btn" type="button" id="cCancel" hidden>Cancel</button></div>
+</form>
+</div>
+</section>
+
+<section class="view" id="v-log">
+<h2>Moved</h2>
+<div class="stats">
+<div class="stat hot"><b id="sStreak">0</b><span>day streak</span></div>
+<div class="stat"><b id="sBest">0</b><span>best streak</span></div>
+<div class="stat"><b id="sDays">0</b><span>days moved, last 7</span></div>
+</div>
+<div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px">
+<div class="stat"><b id="sBreaks">0</b><span>breaks today</span></div>
+<div class="stat"><b id="sMin">0</b><span>minutes today</span></div>
+</div>
+<div class="panel">
+<div class="tag" id="allTime" style="margin-bottom:10px"></div>
+<div class="bars" id="bars"></div>
+<div class="bl muted"><span>2 weeks ago</span><span>Today</span></div>
+</div>
+<div class="panel"><h3 style="margin-top:0">Recent</h3><ul class="list" id="logList"></ul></div>
+<div class="panel">
+<h3 style="margin-top:0">Nudge me</h3>
+<p class="muted" style="margin:0 0 10px;font-size:15px">A banner shows here in the app after this long without a logged break.</p>
+<div class="chips" id="remind"></div>
+</div>
+<div class="panel">
+<h3 style="margin-top:0">Card shine</h3>
+<p class="muted" style="margin:0 0 10px;font-size:15px">Tilt your phone to move the foil shine on upgraded cards. You can also drag a finger across a card.</p>
+<button class="btn sm" id="tiltBtn" style="width:100%">Turn on tilt shine</button>
+</div>
+<div class="panel">
+<details><summary style="min-height:44px;display:flex;align-items:center;font-weight:800;cursor:pointer">Backup and restore</summary>
+<p class="muted" style="font-size:15px">Your log and card levels live in this browser only. Copy a backup now and then.</p>
+<div class="row"><button class="btn sm" id="bkCopy">Copy backup</button></div>
+<label class="f" for="bkIn">Paste a backup to restore</label><textarea class="in" id="bkIn" rows="3"></textarea>
+<div class="row" style="margin-top:8px"><button class="btn sm" id="bkLoad">Restore</button></div>
+</details>
+</div>
+</section>
+</div>
+
+<nav><div id="tabs">
+<button data-v="draw" class="on"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 9v6M9 12h6"/></svg>Draw</button>
+<button data-v="focus"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M10 2h4"/></svg>Focus</button>
+<button data-v="walk"><svg viewBox="0 0 24 24"><circle cx="13" cy="4" r="2"/><path d="M10 22l2-7 3 3v4M8 12l3-4 3 2 3 1M11 8l-1 6"/></svg>Walk</button>
+<button data-v="deck"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="15" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v12"/></svg><span>Cards<span id="owedDot"></span></span></button>
+<button data-v="log"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Log</button>
+</div></nav>
+
+<div class="upg" id="upg"></div>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const dayKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const restart=(el,cls)=>{el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls)};
+
+const ICON={
+pushup:'<path d="M3 18h18M5 15l12-4M17 11v7"/><circle cx="4" cy="14" r="1.6"/>',
+squat:'<path d="M5 21h14M12 3v5M8 13h8M8 13v8M16 13v8"/><circle cx="12" cy="3" r=".1"/>',
+jacks:'<circle cx="12" cy="4" r="2"/><path d="M12 7v7M5 3l7 6 7-6M7 21l5-7 5 7"/>',
+highknees:'<circle cx="11" cy="3.5" r="2"/><path d="M11 6v7l-3 8M11 13l5-2v5M7 9l4-2 4 2"/>',
+climbers:'<path d="M3 19h18M4 9l10 3M14 12l-3 7M14 12l5 3"/><circle cx="3.5" cy="8" r="1.5"/>',
+plank:'<path d="M3 18h18M5 15l14-5M19 10v8"/>',
+lunge:'<circle cx="11" cy="3.5" r="2"/><path d="M11 6v7M11 13l-5 3v5M11 13l5 1 1 7M3 21h18"/>',
+wallsit:'<path d="M19 2v20M19 8h-5v6H8v7M3 21h16"/><circle cx="16" cy="5" r="1.6"/>',
+bridge:'<path d="M2 19h4M18 19h4M6 19c1.5-9 10.5-9 12 0"/>',
+dips:'<path d="M3 11h10v10M3 11v10M13 14l5 2 2 5"/><circle cx="16" cy="9" r="1.6"/>',
+burpee:'<path d="M12 2v6M8 5l4 3 4-3M4 20h16M7 17l10-3"/>',
+calf:'<path d="M5 21h14M12 17V4M8 8l4-4 4 4"/>',
+sideplank:'<path d="M3 20h18M5 18l14-9M19 9V4M19 9l2 1"/>',
+birddog:'<path d="M3 19h18M8 13h8M8 13v6M16 13v6M8 13l-5-3M16 13l5-1"/>',
+deadbug:'<path d="M3 20h18M7 15h10M9 15l-3-8M15 15l3-5M7 15l-3 3"/>',
+sidelunge:'<path d="M3 21h18M12 4v8M12 12l-7 9M12 12l4 9"/><circle cx="12" cy="3" r=".1"/>',
+superman:'<path d="M3 15c3-4 15-4 18 0M3 15l-1-3M21 15l1-3M4 19h16"/>',
+inchworm:'<path d="M3 19h18M5 19c2-12 12-12 14 0"/>',
+taps:'<path d="M3 19h18M6 10l12 4M6 10v9M18 14l-4-6"/>',
+bicycle:'<circle cx="7" cy="16" r="4"/><circle cx="17" cy="16" r="4"/><path d="M7 16l4-7h4l2 7"/>',
+star:'<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6L3.4 9.3l6-.7z"/>'};
+
+const BASE=[
+{id:'pushup',h:350,name:'Push-ups',kind:'reps',per:5,cap:25,cue:'Hands on the floor or the couch edge. Lower with control.',steps:['Place your hands on the floor a little wider than your shoulders.','Step your feet back so your body is straight from head to heels.','Bend your elbows and lower your chest toward the floor over about two seconds.','Press back up to straight arms. Keep your hips in line the whole time.'],easier:'Put your hands on the couch seat or drop to your knees.',harder:'Slow the lowering to four seconds.'},
+{id:'squat',h:28,name:'Squats',kind:'reps',per:10,cap:40,cue:'Hips back, chest up, heels down.',steps:['Stand with feet shoulder-width apart, toes turned out slightly.','Push your hips back and bend your knees as if sitting into a chair.','Go as low as is comfortable with your heels on the floor and chest up.','Drive through your whole foot to stand back up.'],easier:'Squat down until you touch the couch, then stand.',harder:'Pause for two seconds at the bottom.'},
+{id:'jacks',h:45,name:'Jumping jacks',kind:'time',cue:'Arms overhead, feet wide, back in. Steady rhythm.',steps:['Stand with feet together and arms at your sides.','Jump your feet out wide while swinging your arms overhead.','Jump back in and lower your arms.','Keep a steady rhythm and land softly on the balls of your feet.'],easier:'Step one foot out at a time instead of jumping.'},
+{id:'highknees',h:200,name:'High knees',kind:'time',cue:'Jog in place, knees toward hip height.',steps:['Stand tall with feet hip-width apart.','Jog in place, driving one knee up toward hip height, then the other.','Pump your arms in time with your legs.','Stay light on the balls of your feet.'],easier:'March in place with knees lifted.'},
+{id:'climbers',h:12,name:'Mountain climbers',kind:'time',cue:'High plank, drive knees toward chest.',steps:['Start in a high plank with hands under your shoulders.','Drive your right knee toward your chest, then return it.','Switch legs at a pace you can control.','Keep your hips low and shoulders over your hands.'],easier:'Hands on the couch seat, and step the knees in slowly.'},
+{id:'plank',h:240,name:'Plank',kind:'time',cue:'Forearms down, body straight. Rest when you need.',steps:['Put your forearms on the floor with elbows under your shoulders.','Step your feet back so your body is a straight line from head to heels.','Brace your stomach and squeeze your glutes. Breathe steadily.','Hold 20 to 30 seconds, rest 10, and repeat until time is up.'],easier:'Drop to your knees, or rest forearms on the couch seat.'},
+{id:'lunge',h:320,name:'Reverse lunges',kind:'reps',per:8,cap:30,cue:'Step back, both knees bend, alternate legs.',steps:['Stand tall with feet hip-width apart.','Step one foot back and lower until both knees bend to about 90 degrees.','Keep your front knee over your ankle and your chest up.','Push through the front heel to return. Alternate legs.'],easier:'Hold the back of the couch for balance and take a shorter step.'},
+{id:'wallsit',h:265,name:'Wall sit',kind:'time',cue:'Back on the wall, thighs toward parallel. Hold and breathe.',steps:['Stand with your back flat against a wall.','Walk your feet out about two feet and slide down until your knees bend.','Aim for thighs near parallel with the floor, knees over ankles.','Hold 20 to 40 seconds, stand to rest, and repeat until time is up.'],easier:'Slide down only halfway.'},
+{id:'bridge',h:300,name:'Glute bridges',kind:'reps',per:10,cap:30,cue:'On your back, feet flat. Squeeze at the top.',steps:['Lie on your back with knees bent and feet flat, hip-width apart.','Press through your heels and lift your hips until knees, hips and shoulders line up.','Squeeze your glutes at the top for a beat.','Lower slowly back down.'],harder:'Lift one foot off the floor and split the reps between legs.'},
+{id:'dips',h:20,name:'Couch dips',kind:'reps',per:6,cap:25,cue:'Hands on the couch edge, lower with bent elbows.',steps:['Sit on the edge of a sturdy couch or chair with hands beside your hips, fingers forward.','Slide your hips off the edge, feet flat and knees bent.','Bend your elbows straight back to lower your hips a few inches.','Press up until your arms are straight.'],easier:'Keep your feet closer and lower less.',caution:'Skip this if it bothers your shoulders. Make sure the couch will not slide.'},
+{id:'burpee',h:0,name:'Burpees',kind:'reps',per:4,cap:15,min:60,cue:'Down, back, up. Step it out if you like.',steps:['Stand with feet shoulder-width apart.','Squat down and place your hands on the floor.','Step or jump your feet back into a plank.','Step or jump your feet back to your hands, then stand up tall.'],easier:'Step back and forward one foot at a time, and skip any jump.',harder:'Add a push-up at the plank and a jump at the top.'},
+{id:'calf',h:150,name:'Calf raises',kind:'reps',per:12,cap:50,cue:'Hold the couch if you like. Pause at the top.',steps:['Stand with your fingertips on the couch back or a wall for balance.','Rise onto the balls of your feet as high as you can.','Pause for a beat at the top.','Lower your heels slowly to the floor.'],harder:'Do one leg at a time and split the reps.'},
+{id:'sideplank',h:270,name:'Side plank',kind:'time',min:60,cue:'On one forearm, hips lifted. Switch halfway.',steps:['Lie on your side with your elbow under your shoulder and legs stacked.','Lift your hips so your body forms a straight line.','Hold and breathe. Keep your hips from sagging.','Switch sides halfway through.'],easier:'Bend your knees and keep them on the floor.'},
+{id:'birddog',h:175,name:'Bird dog',kind:'reps',per:6,cap:24,cue:'On all fours, reach opposite arm and leg.',steps:['Start on hands and knees, hands under shoulders and knees under hips.','Reach your right arm forward and left leg back until both are straight.','Hold for a beat, keeping your back flat and hips level.','Return and switch sides. Each reach is one rep.'],easier:'Move only the leg, or only the arm.'},
+{id:'deadbug',h:95,name:'Dead bug',kind:'reps',per:8,cap:30,cue:'On your back, lower opposite arm and leg slowly.',steps:['Lie on your back with arms pointing at the ceiling and knees bent at 90 degrees above your hips.','Press your lower back gently into the floor.','Slowly lower your right arm overhead and straighten your left leg toward the floor.','Return and switch sides. Each side is one rep.'],easier:'Move only the legs and keep the arms up.'},
+{id:'sidelunge',h:60,name:'Side lunges',kind:'reps',per:6,cap:24,cue:'Step wide, sit into one hip, keep the other leg straight.',steps:['Stand with feet together.','Take a wide step to the right and push your hips back, bending the right knee.','Keep your left leg straight and both feet flat.','Push back to the start and alternate sides.'],easier:'Take a smaller step and bend less.'},
+{id:'superman',h:225,name:'Supermans',kind:'reps',per:8,cap:25,cue:'Face down, lift arms and legs together.',steps:['Lie face down with arms stretched overhead and legs straight.','Lift your arms, chest and legs a few inches off the floor.','Hold for two seconds, looking at the floor to keep your neck neutral.','Lower slowly and repeat.'],easier:'Lift only the arms, then only the legs.'},
+{id:'inchworm',h:130,name:'Inchworms',kind:'reps',per:3,cap:12,min:60,cue:'Fold, walk hands out to plank, walk back.',steps:['Stand tall, then hinge at the hips and put your hands on the floor. Bend your knees as needed.','Walk your hands forward until you are in a high plank.','Walk your hands back toward your feet.','Roll up to standing. That is one rep.'],harder:'Add a push-up when you reach the plank.'},
+{id:'taps',h:335,name:'Plank shoulder taps',kind:'reps',per:16,cap:50,cue:'High plank, tap opposite shoulder, hips still.',steps:['Start in a high plank with hands under shoulders and feet a little wider than hips.','Lift your right hand and tap your left shoulder.','Put it back down and tap with the left hand.','Keep your hips as still as you can. Each tap is one rep.'],easier:'Drop to your knees or put your hands on the couch seat.'},
+{id:'bicycle',h:185,name:'Bicycle crunches',kind:'reps',per:20,cap:60,cue:'Elbow toward opposite knee, slow and controlled.',steps:['Lie on your back with hands lightly behind your head and knees lifted.','Bring your right elbow toward your left knee while straightening the right leg.','Switch sides in a slow pedaling motion.','Each side is one rep. Do not pull on your neck.'],easier:'Keep your feet on the floor and twist toward each knee.'}
+];
+const PROMPTS=["What's the smallest next step?","What am I avoiding, and why?","What would make today feel done?","What's the real problem here?","What can I drop this week?","What would I tell a friend in my spot?","What's working that I should do more of?","Who could I help today?","What does finished look like?","If I only had an hour, what would I cut?"];
+const TIERS=[{n:'Base',at:0,g:'#ffffff'},{n:'Foil',at:3,g:'#d6dcff'},{n:'Gold',at:8,g:'#ffcd2e'},{n:'Holo',at:15,g:'#7ef9ff'},{n:'Prism',at:30,g:'#ff6bd6'}];
+const tierOf=n=>{let t=0;TIERS.forEach((x,i)=>{if(n>=x.at)t=i});return t};
+
+let S={log:[],custom:[],off:{},owed:[],count:null,remind:0,mute:false,focus:{len:25,brk:5,phase:'focus',running:false,endAt:0,left:1500,pausedByWalk:false},walk:{len:10,start:0,promptOff:false}};
+try{const raw=localStorage.getItem('quickdraw.v1');if(raw){const d=JSON.parse(raw);S={...S,...d,focus:{...S.focus,...d.focus},walk:{...S.walk,...d.walk}}}}catch(e){}
+const save=()=>{try{localStorage.setItem('quickdraw.v1',JSON.stringify(S))}catch(e){}};
+const allCards=()=>BASE.concat(S.custom);
+const byId=id=>allCards().find(c=>c.id===id);
+if(!S.count){S.count={};S.log.forEach(l=>{const c=l.id?byId(l.id):allCards().find(x=>x.name===l.name);if(c&&l.src!=='walk')S.count[c.id]=(S.count[c.id]||0)+1});save()}
+const OLD={wallpush:'pushup',sitstand:'squat',stepjack:'jacks',march:'highknees'};if(S.count){Object.entries(OLD).forEach(([o,n])=>{if(S.count[o]){S.count[n]=(S.count[n]||0)+S.count[o];delete S.count[o]}});S.log.forEach(l=>{if(OLD[l.id])l.id=OLD[l.id]});save()}
+const cnt=id=>S.count[id]||0;
+const hueOf=c=>c.h??((c.name||'').split('').reduce((a,ch)=>a+ch.charCodeAt(0),0)*37%360);
+
+/* ---------- sound ---------- */
+let ac=null;
+const A=()=>{if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){return null}}if(ac.state==='suspended')ac.resume();return ac};
+const tone=(f,t0,d,type,g,f2)=>{if(S.mute)return;const a=A();if(!a)return;const t=a.currentTime+t0,o=a.createOscillator(),v=a.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);v.gain.setValueAtTime(0,t);v.gain.linearRampToValueAtTime(g||.12,t+.008);v.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(v);v.connect(a.destination);o.start(t);o.stop(t+d+.05)};
+const noise=(t0,d,g,f1,f2)=>{if(S.mute)return;const a=A();if(!a)return;const t=a.currentTime+t0,len=Math.ceil(a.sampleRate*d),b=a.createBuffer(1,len,a.sampleRate),ch=b.getChannelData(0);for(let i=0;i<len;i++)ch[i]=Math.random()*2-1;const s=a.createBufferSource(),fl=a.createBiquadFilter(),v=a.createGain();s.buffer=b;fl.type='bandpass';fl.Q.value=1.2;fl.frequency.setValueAtTime(f1,t);fl.frequency.exponentialRampToValueAtTime(f2,t+d);v.gain.setValueAtTime(0,t);v.gain.linearRampToValueAtTime(g,t+d*.8);v.gain.linearRampToValueAtTime(0,t+d);s.connect(fl);fl.connect(v);v.connect(a.destination);s.start(t)};
+const PENTA=[0,2,4,7,9,12,14,16,19,21,24,26,28,31,33,36,38,40,43,45];
+const nf=n=>523.25*2**(n/12);
+const SFX={
+tap:i=>{tone(nf(PENTA[Math.min(i,PENTA.length-1)]),0,.12,'triangle',.16);tone(nf(PENTA[Math.min(i,PENTA.length-1)]+12),0,.06,'sine',.05)},
+charge:(t,d)=>{noise(0,d,.12+t*.04,300,3000+t*1500);tone(110,0,d,'sawtooth',.025,220+t*110)},
+reveal:t=>{const ch=[[0,4,7],[0,4,7,12],[0,4,7,11,14],[0,4,7,12,16,19],[0,4,7,11,14,19,24]][t];noise(0,.25,.15,4000,600);ch.forEach((n,i)=>tone(nf(n),.02+i*.06,.5+t*.1,'triangle',.11));if(t>=2)for(let i=0;i<6+t*3;i++)tone(nf(24+PENTA[i%10]),.25+i*.045,.18,'sine',.04)},
+done:()=>{tone(nf(7),0,.15,'triangle',.14);tone(nf(12),.09,.3,'triangle',.14);tone(nf(19),.18,.4,'sine',.06)},
+upgrade:()=>{[0,4,7,12,7,12,16,19,24].forEach((n,i)=>tone(nf(n),i*.08,.35,i%2?'square':'triangle',.07));for(let i=0;i<14;i++)tone(nf(28+PENTA[i%8]),.7+i*.05,.25,'sine',.035)},
+streak:()=>{[0,7,12,16].forEach((n,i)=>tone(nf(n-5),i*.07,.3,'triangle',.1))},
+redraw:()=>noise(0,.18,.1,2000,500)};
+const muteIcon=()=>{$('muteBtn').innerHTML=S.mute?'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6"/></svg>':'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM17 8a5 5 0 0 1 0 8M19.5 5.5a8.5 8.5 0 0 1 0 13"/></svg>';$('muteBtn').setAttribute('aria-label',S.mute?'Sound off':'Sound on')};
+$('muteBtn').addEventListener('click',()=>{S.mute=!S.mute;save();muteIcon();if(!S.mute)SFX.done()});
+
+/* ---------- particles ---------- */
+const cv=$('fx'),cx=cv.getContext('2d');let parts=[],raf=0;
+const sizeCv=()=>{const r=devicePixelRatio||1;cv.width=innerWidth*r;cv.height=innerHeight*r;cx.setTransform(r,0,0,r,0,0)};sizeCv();addEventListener('resize',sizeCv);
+const RAIN=['#ff5f6d','#ffc371','#47e891','#40c4ff','#b388ff','#fff'];
+const PAL=[['#ffcd2e','#fff','#8fa6ff'],['#ffffff','#d6dcff','#a3abc6','#ffcd2e'],['#ffcd2e','#fff2a8','#d39a13','#fff'],RAIN,RAIN];
+const burst=(x,y,n,cols,sp=1)=>{if(RM)return;for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,v=(2+Math.random()*7)*sp;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,l:1,d:.012+Math.random()*.02,c:cols[i%cols.length],s:3+Math.random()*5,r:Math.random()*6,vr:(Math.random()-.5)*.4,k:Math.random()<.35})}if(!raf)raf=requestAnimationFrame(step)};
+const step=()=>{cx.clearRect(0,0,innerWidth,innerHeight);parts=parts.filter(p=>p.l>0);parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.18;p.vx*=.985;p.r+=p.vr;p.l-=p.d;cx.globalAlpha=Math.max(0,p.l);cx.fillStyle=p.c;cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);if(p.k){cx.beginPath();for(let j=0;j<8;j++){const rr=j%2?p.s*.4:p.s*1.3,aa=j*Math.PI/4;cx.lineTo(Math.cos(aa)*rr,Math.sin(aa)*rr)}cx.fill()}else cx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);cx.restore()});cx.globalAlpha=1;raf=parts.length?requestAnimationFrame(step):0;if(!raf)cx.clearRect(0,0,innerWidth,innerHeight)};
+const centerOf=el=>{const r=el.getBoundingClientRect();return[r.left+r.width/2,r.top+r.height/2]};
+const flash=()=>{if(!RM)restart($('flash'),'go')};
+
+const toastEl=$('toast');let toastT;
+const toast=m=>{toastEl.textContent=m;toastEl.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('on'),2200)};
+
+/* ---------- card face ---------- */
+const sparkles=()=>[[12,18],[78,12],[85,62],[20,70],[50,40],[65,85]].map(([x,y],i)=>'<i class="spk" style="left:'+x+'%;top:'+y+'%;animation-delay:'+(i*.27)+'s"></i>').join('');
+const artHTML=c=>{const t=tierOf(cnt(c.id));return '<div class="art" style="--h:'+hueOf(c)+'"><svg viewBox="0 0 24 24">'+(ICON[c.id]||ICON.star)+'</svg>'+(t>=4?sparkles():'')+'</div>'};
+const amountOf=(c,d)=>c.kind==='reps'?repsFor(c,d)+' reps':fmt(d);
+const repsFor=(c,d)=>Math.min(c.cap||999,Math.max(c.per,Math.round(c.per*d/30)));
+const faceHTML=(c,d,tierOverride)=>{const n=cnt(c.id),t=tierOverride??tierOf(n),nx=TIERS[t+1];
+let cue=c.cue||'';if(d&&c.kind==='reps')cue+=repsFor(c,d)>=c.cap?' That is the cap, so rest in the spare time.':' No rushing.';
+return '<div class="cf t'+t+'"><div class="inner"><div class="ttl"><span class="nm">'+esc(c.name)+'</span><span class="gem">'+TIERS[t].n+'</span></div>'+artHTML(c)+
+(d?'<div class="big" id="bigTxt">'+esc(amountOf(c,d))+'</div>':'')+'<p class="cue">'+esc(cue)+'</p>'+
+'<div class="foot"><button class="howto" data-how="'+esc(c.id)+'">How to do it</button><span>×'+n+(nx?' · '+(nx.at-n)+' to '+nx.n:'')+'</span></div>'+
+(c.from?'<div class="from">From <b>'+esc(c.from)+'</b></div>':'')+'</div></div>'};
+
+/* ---------- tabs ---------- */
+let view='draw';
+const go=v=>{view=v;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='log')renderLog();if(v==='deck')renderDeck();window.scrollTo(0,0)};
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.v)});
+$('streakBtn').addEventListener('click',()=>go('log'));
+
+/* ---------- log + streaks ---------- */
+let lastSession=Date.now();
+const daySet=()=>new Set(S.log.map(l=>dayKey(l.t)));
+const streakNow=()=>{const ds=daySet();const d=new Date();if(!ds.has(dayKey(d)))d.setDate(d.getDate()-1);let n=0;while(ds.has(dayKey(d))){n++;d.setDate(d.getDate()-1)}return n};
+const bestStreak=()=>{const ks=[...daySet()].sort();let best=0,run=0,prev=null;ks.forEach(k=>{const d=new Date(k+'T12:00');if(prev&&(d-prev)/864e5<1.5)run++;else run=1;best=Math.max(best,run);prev=d});return best};
+const addLog=(src,name,sec,from,id)=>{const before=streakNow(),movedToday=daySet().has(dayKey(Date.now()));
+S.log.unshift({t:Date.now(),src,name,sec:Math.round(sec),from:from||'',id:id||''});if(S.log.length>3000)S.log.length=3000;save();renderTop();$('nudge').classList.remove('on');
+const after=streakNow();return !movedToday&&after>=1?{streak:after,grew:after>before}:null};
+const renderTop=()=>{const n=streakNow(),lit=daySet().has(dayKey(Date.now()));$('streakN').textContent=n;$('streakBtn').classList.toggle('lit',lit);$('streakBtn').setAttribute('aria-label',n+' day streak'+(lit?'':', not moved yet today'));const o=S.owed.length;$('owedDot').innerHTML=o?'<span class="dot">'+o+'</span>':''};
+const celebrateStreak=r=>{restart($('streakBtn'),'pop');SFX.streak();const [x,y]=centerOf($('streakBtn'));const big=[3,7,14,30,50,100].includes(r.streak);burst(x,y,big?60:24,big?RAIN:['#ffcd2e','#ff7a1a','#fff']);toast(r.streak===1?'Day 1. Streak started.':big?r.streak+' day streak!':'Day '+r.streak+' of your streak')};
+const SRC={draw:'Quick Draw',focus:'Focus break',walk:'Walk'};
+const renderLog=()=>{
+const now=Date.now(),k=dayKey(now),today=S.log.filter(l=>dayKey(l.t)===k);
+$('sBreaks').textContent=today.length;$('sMin').textContent=Math.round(today.reduce((a,l)=>a+l.sec,0)/60);
+$('sStreak').textContent=streakNow();$('sBest').textContent=bestStreak();
+const byDay={};S.log.forEach(l=>{const d=dayKey(l.t);byDay[d]=(byDay[d]||0)+l.sec});
+const days=[];for(let i=13;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);days.push(byDay[dayKey(d)]||0)}
+$('sDays').textContent=days.slice(7).filter(x=>x>0).length;
+const mx=Math.max(60,...days);
+$('bars').innerHTML=days.map(s=>'<i class="'+(s?'':'z')+'" style="height:'+(s?Math.max(6,s/mx*100):3)+'%"></i>').join('');
+const nd=Object.keys(byDay).length;$('allTime').textContent=nd+(nd===1?' day':' days')+' moved all time · '+Math.round(S.log.reduce((a,l)=>a+l.sec,0)/60)+' minutes total';
+$('logList').innerHTML=S.log.length?S.log.slice(0,30).map((l,i)=>{const d=new Date(l.t);const when=(dayKey(l.t)===k?'Today':d.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}))+', '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});return '<li><div class="t">'+esc(l.name)+'<small>'+esc(SRC[l.src]||'')+' · '+fmt(l.sec)+' · '+when+(l.from?' · from '+esc(l.from):'')+'</small></div><button class="x" data-del="'+i+'" aria-label="Delete entry">×</button></li>'}).join(''):'<li class="muted">Nothing logged yet. Your first break shows up here.</li>';
+$('remind').innerHTML=[[0,'Off'],[1,'After 1 hour'],[2,'After 2 hours']].map(([v,t])=>'<button class="chip'+(S.remind===v?' on':'')+'" data-r="'+v+'">'+t+'</button>').join('');
+};
+let undoFn=null;
+$('logList').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;const i=+b.dataset.del;const gone=S.log.splice(i,1)[0];if(gone.id&&S.count[gone.id])S.count[gone.id]--;save();renderLog();renderTop();
+undoFn=()=>{S.log.splice(i,0,gone);if(gone.id)S.count[gone.id]=(S.count[gone.id]||0)+1;save();renderLog();renderTop()};
+openSheet('<h2>Entry removed</h2><p class="muted" style="margin-top:0">Its card level and your streak were adjusted too.</p><div class="row"><button class="btn pri" data-a="undo">Undo</button><button class="btn" data-a="close">OK</button></div>')});
+$('remind').addEventListener('click',e=>{const b=e.target.closest('[data-r]');if(!b)return;S.remind=+b.dataset.r;lastSession=Date.now();save();renderLog()});
+
+/* ---------- sheet ---------- */
+let afterSheet=null;
+const openSheet=h=>{$('sheet').innerHTML=h;$('scrim').classList.add('on');$('sheet').scrollTop=0};
+const closeSheet=()=>{$('scrim').classList.remove('on');const f=afterSheet;afterSheet=null;f&&f()};
+$('scrim').addEventListener('click',e=>{if(e.target===$('scrim'))closeSheet()});
+const stepsHTML=c=>{const st=(c.steps&&c.steps.length)?c.steps:[c.cue||'Do it at whatever pace feels right.'];
+return '<ol class="steps">'+st.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ol>'+(c.easier?'<p class="note"><b>Easier:</b> '+esc(c.easier)+'</p>':'')+(c.harder?'<p class="note"><b>Harder:</b> '+esc(c.harder)+'</p>':'')+(c.caution?'<p class="note"><b>Careful:</b> '+esc(c.caution)+'</p>':'')+'<p class="muted" style="font-size:14px">Stop if anything hurts. Rest any time.</p>'};
+const howSheet=c=>openSheet('<div class="tag">How to do it</div><h2>'+esc(c.name)+'</h2>'+stepsHTML(c)+'<div class="row"><button class="btn pri" data-a="close">Got it</button></div>');
+document.addEventListener('click',e=>{const b=e.target.closest('[data-how]');if(!b)return;e.stopPropagation();const c=byId(b.dataset.how);if(c)howSheet(c)},true);
+
+/* ---------- quick draw ---------- */
+let dur=0,taps=0,revealT=null,chargeT=null,cur=null,drawSrc='draw',recent=[],mini=null,phase='idle';
+const card=$('card'),pill=$('pill'),bouncer=$('bouncer'),stage=$('stage');
+const pick=(d,not)=>{let pool=allCards().filter(c=>!S.off[c.id]&&(c.min||0)<=d);if(!pool.length)pool=allCards().filter(c=>!(c.min>0));
+let p2=pool.filter(c=>c.id!==not&&!recent.includes(c.id));if(!p2.length)p2=pool.filter(c=>c.id!==not);if(!p2.length)p2=pool;
+const c=p2[Math.floor(Math.random()*p2.length)];recent.unshift(c.id);recent=recent.slice(0,3);return c};
+const renderFront=()=>{$('front').innerHTML=faceHTML(cur,dur)};
+const charge=(not,quick)=>{cur=pick(dur,not);const t=tierOf(cnt(cur.id));phase='charge';
+stage.style.setProperty('--glow',TIERS[t].g);stage.classList.add('charging');bouncer.classList.add('shake');
+const d=quick?.25:(.38+t*.12);SFX.charge(t,d);buzz(30);chargeT=setTimeout(flip,d*1000)};
+const flip=()=>{clearTimeout(chargeT);if(phase!=='charge')return;phase='up';const t=tierOf(cnt(cur.id));
+renderFront();stage.classList.remove('charging');bouncer.classList.remove('shake');card.classList.add('up');
+SFX.reveal(t);buzz(t>=2?[40,40,80]:40);const [x,y]=centerOf(bouncer);burst(x,y,22+t*22,PAL[t],1+t*.15);if(t>=2)flash();
+$('drawCtl').hidden=true;$('revealCtl').hidden=false;setTimerBtn('Start '+fmt(dur)+' timer',null)};
+const resetDraw=()=>{clearTimeout(revealT);clearTimeout(chargeT);stopMini();dur=0;taps=0;cur=null;phase='idle';card.classList.remove('up','fast');stage.classList.remove('charging');bouncer.classList.remove('shake','collect');pill.textContent='Tap to deal';pill.classList.add('empty');$('drawCtl').hidden=false;$('revealCtl').hidden=true;drawSrc='draw'};
+const setDur=d=>{dur=Math.min(600,d);pill.textContent=fmt(dur);pill.classList.remove('empty');restart(pill,'bump')};
+const floatTxt=(el,txt)=>{const r=el.getBoundingClientRect();const f=document.createElement('div');f.className='float';f.textContent=txt;f.style.left=(r.left+r.width/2+(Math.random()*60-30))+'px';f.style.top=(r.top+8)+'px';document.body.appendChild(f);setTimeout(()=>f.remove(),750)};
+$('tap').addEventListener('click',e=>{if(phase==='up'||phase==='charge')resetDraw();setDur(dur+30);SFX.tap(taps++);buzz(8);restart(bouncer,'pop');floatTxt($('tap'),'+30');
+const [x,y]=centerOf(pill);burst(x,y,6+Math.min(taps,8),['#ffcd2e','#fff'],.6);clearTimeout(revealT);revealT=setTimeout(()=>charge(),500)});
+bouncer.addEventListener('click',()=>{if(phase==='charge')flip()});
+$('redraw').addEventListener('click',()=>{stopMini();SFX.redraw();const old=cur.id;card.classList.add('fast');card.classList.remove('up');setTimeout(()=>{card.classList.remove('fast');charge(old,true)},RM?0:200)});
+$('newDraw').addEventListener('click',resetDraw);
+const tb=$('miniTimer');
+const setTimerBtn=(txt,p)=>{$('miniLbl').textContent=txt;tb.classList.toggle('run',p!=null);tb.classList.toggle('half',(p||0)>=50);tb.style.setProperty('--p',(p||0)+'%')};
+const stopMini=()=>{mini=null;if(dur)setTimerBtn('Start '+fmt(dur)+' timer',null);else setTimerBtn('Start timer',null)};
+tb.addEventListener('click',()=>{if(mini){stopMini();if(cur)renderFront();return}A();tone(nf(7),0,.12,'triangle',.12);mini={end:Date.now()+dur*1000,len:dur};setTimerBtn('Stop · '+fmt(dur),0)});
+$('done').addEventListener('click',()=>{const c=cur,d=dur,src=drawSrc,before=tierOf(cnt(c.id));
+S.count[c.id]=cnt(c.id)+1;const st=addLog(src,c.name,d,c.from,c.id);const after=tierOf(cnt(c.id));
+SFX.done();buzz(30);const [x,y]=centerOf(bouncer);burst(x,y,30,PAL[after]);restart(bouncer,'collect');phase='done';
+setTimeout(()=>{resetDraw();
+const queue=[];if(after>before)queue.push(()=>showUpgrade(c,after));if(st)queue.push(()=>celebrateStreak(st));if(c.from)queue.push(()=>friendSheet(c,true));
+const run=()=>{const f=queue.shift();if(!f){if(src==='focus')go('focus');return}f();if($('upg').classList.contains('on')||$('scrim').classList.contains('on'))nextUp=run;else setTimeout(run,700)};
+toast('Logged · '+fmt(d)+' moved');run()},RM?0:420)});
+let nextUp=null;
+const continueQueue=()=>{const f=nextUp;nextUp=null;f&&f()};
+
+/* ---------- upgrade ---------- */
+const showUpgrade=(c,t)=>{const u=$('upg');u.innerHTML='<div class="prev">'+faceHTML(c,0,t)+'</div><div class="lbl">'+TIERS[t].n+' upgrade!</div><p class="sub2">'+esc(c.name)+' · done '+cnt(c.id)+' times</p><button class="btn pri" id="upgOk">Nice</button>';u.classList.add('on');
+SFX.upgrade();buzz([60,40,60,40,120]);flash();setTimeout(()=>{const [x,y]=centerOf(u.querySelector('.prev'));burst(x,y,110,t>=3?RAIN:PAL[t],1.4)},250);
+$('upgOk').addEventListener('click',()=>{u.classList.remove('on');setTimeout(continueQueue,150)})};
+
+/* ---------- friends ---------- */
+const msgFor=o=>'Did your "'+o.name+'" card today. Thanks for the idea!';
+let sheetOwed=null;
+const friendSheet=(c,isNew)=>{let o=isNew?{id:Date.now()+'',name:c.name,from:c.from,contact:c.contact||'',t:Date.now()}:c;if(isNew){S.owed.unshift(o);save();renderTop()}sheetOwed=o;
+const isUrl=/^https?:\/\//i.test(o.contact);
+afterSheet=continueQueue;
+openSheet('<div class="tag">Card from '+esc(o.from)+'</div><h2>Tell '+esc(o.from)+' you did it</h2><textarea class="in" id="fMsg" rows="3">'+esc(msgFor(o))+'</textarea><div class="row" style="margin-top:10px"><button class="btn pri" data-a="copy">Copy message</button>'+(isUrl?'<a class="btn" style="display:grid;place-items:center;text-decoration:none" href="'+esc(o.contact)+'" target="_blank" rel="noopener">Open their link</a>':'')+'</div>'+(!isUrl&&o.contact?'<p class="muted" style="margin:8px 0 0">Reach them at <b style="color:var(--ink)">'+esc(o.contact)+'</b></p>':'')+'<div class="row" style="margin-top:10px"><button class="btn" data-a="told">I told them</button><button class="btn" data-a="close">Later</button></div>')};
+$('sheet').addEventListener('click',async e=>{const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
+if(a==='close')closeSheet();
+if(a==='undo'){undoFn&&undoFn();undoFn=null;closeSheet()}
+if(a==='copy'){try{await navigator.clipboard.writeText($('fMsg').value);toast('Copied')}catch(err){$('fMsg').select();toast('Select and copy the text')}}
+if(a==='told'&&sheetOwed){S.owed=S.owed.filter(o=>o.id!==sheetOwed.id);save();renderTop();if(view==='deck')renderDeck();closeSheet();tone(nf(12),0,.2,'triangle',.1);toast('Nice. Marked as told.')}
+if(a==='toggle'){const id=b.dataset.id;if(S.off[id])delete S.off[id];else S.off[id]=true;save();renderDeck();b.textContent=S.off[id]?'Add back to deck':'Take out of deck'}
+if(a==='edit'){closeSheet();editCard(b.dataset.id)}
+});
+
+/* ---------- collection ---------- */
+let editing=null,kind='time';
+const renderDeck=()=>{
+$('owedBox').hidden=!S.owed.length;
+$('owedList').innerHTML=S.owed.map(o=>'<li><div class="t">'+esc(o.from)+'<small>'+esc(o.name)+' · '+new Date(o.t).toLocaleDateString([], {month:'short',day:'numeric'})+'</small></div><button class="btn sm" data-ow="'+esc(o.id)+'">Message</button></li>').join('');
+const cs=allCards(),tc=[0,0,0,0,0];cs.forEach(c=>tc[tierOf(cnt(c.id))]++);
+$('colSum').textContent=cs.length+' cards'+[1,2,3,4].filter(i=>tc[i]).map(i=>' · '+tc[i]+' '+TIERS[i].n).join('');
+$('grid').innerHTML=cs.map(c=>{const n=cnt(c.id),t=tierOf(n),nx=TIERS[t+1],pr=nx?(n-TIERS[t].at)/(nx.at-TIERS[t].at)*100:100;
+return '<button class="mini'+(S.off[c.id]?' off':'')+'" data-card="'+esc(c.id)+'" aria-label="'+esc(c.name)+'"><div class="cf t'+t+'"><div class="inner"><div class="nm">'+esc(c.name)+'</div>'+artHTML(c)+'<div class="meta"><span>'+TIERS[t].n+' · ×'+n+'</span><span>'+(S.off[c.id]?'Off':nx?(nx.at-n)+' to go':'Max')+'</span></div><div class="prog"><i class="t'+Math.min(4,t+1)+'" style="width:'+pr+'%"></i></div></div></div></button>'}).join('');
+};
+$('grid').addEventListener('click',e=>{const b=e.target.closest('[data-card]');if(!b)return;const c=byId(b.dataset.card);const custom=!BASE.includes(c);tone(nf(9),0,.08,'triangle',.08);
+openSheet('<div class="prev">'+faceHTML(c,0)+'</div>'+'<h2 style="margin-bottom:4px">How to do it</h2>'+stepsHTML(c)+'<div class="row"><button class="btn" data-a="toggle" data-id="'+esc(c.id)+'">'+(S.off[c.id]?'Add back to deck':'Take out of deck')+'</button>'+(custom?'<button class="btn" data-a="edit" data-id="'+esc(c.id)+'">Edit</button>':'')+'</div><div class="row" style="margin-top:8px"><button class="btn pri" data-a="close">Close</button></div>')});
+$('owedList').addEventListener('click',e=>{const b=e.target.closest('[data-ow]');if(b)friendSheet(S.owed.find(o=>o.id===b.dataset.ow),false)});
+const setKind=k=>{kind=k;document.querySelectorAll('#cKind .chip').forEach(b=>b.classList.toggle('on',b.dataset.k===k));$('repFields').hidden=k!=='reps'};
+$('cKind').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(b)setKind(b.dataset.k)});
+const editCard=id=>{const c=S.custom.find(x=>x.id===id);if(!c)return;editing=id;
+$('cName').value=c.name;$('cCue').value=c.cue||'';$('cSteps').value=(c.steps||[]).join('\n');setKind(c.kind);$('cPer').value=c.per||5;$('cCap').value=c.cap||25;$('cMin').value=c.min||0;$('cFrom').value=c.from||'';$('cContact').value=c.contact||'';
+$('formTitle').textContent='Edit card';$('cSave').textContent='Save';$('cCancel').hidden=false;$('cCancel').textContent='Delete card';$('cardForm').scrollIntoView({behavior:'smooth'})};
+const clearForm=()=>{$('cardForm').reset();setKind('time');editing=null;$('formTitle').textContent="Add a friend's card";$('cSave').textContent='Add to deck';$('cCancel').hidden=true};
+$('cCancel').addEventListener('click',()=>{if(editing){S.custom=S.custom.filter(c=>c.id!==editing);delete S.off[editing];save();toast('Card removed')}clearForm();renderDeck()});
+$('cardForm').addEventListener('submit',e=>{e.preventDefault();const name=$('cName').value.trim();if(!name)return;
+const c={id:editing||'c'+Date.now(),name,cue:$('cCue').value.trim(),steps:$('cSteps').value.split('\n').map(s=>s.trim()).filter(Boolean),kind,min:+$('cMin').value||0,from:$('cFrom').value.trim(),contact:$('cContact').value.trim()};
+if(kind==='reps'){c.per=Math.max(1,+$('cPer').value||5);c.cap=Math.max(c.per,+$('cCap').value||25)}
+if(editing){const i=S.custom.findIndex(x=>x.id===editing);S.custom[i]=c}else{S.custom.push(c);SFX.done();const [x,y]=centerOf($('cSave'));burst(x,y,30,PAL[0])}
+save();toast(editing?'Saved':'Added to your deck');clearForm();renderDeck()});
+
+/* ---------- focus ---------- */
+const F=S.focus;
+const fTotal=()=>(F.phase==='focus'?F.len:F.brk)*60;
+const fLeft=()=>F.running?Math.max(0,(F.endAt-Date.now())/1000):F.left;
+const fRender=()=>{$('fClock').textContent=fmt(fLeft());$('fPhase').textContent=F.phase==='focus'?'Focus':'Break';$('fGo').textContent=F.running?'Pause':(fLeft()<fTotal()?'Resume':'Start');
+$('fNote').textContent=F.pausedByWalk?'Paused while you walk':(F.phase==='break'?'Up and away from the screen':'');$('fBreak').hidden=F.phase!=='break';
+$('fLen').innerHTML=[15,25,45,50].map(v=>'<button class="chip'+(F.len===v?' on':'')+'" data-fl="'+v+'">'+v+' min</button>').join('');
+$('bLen').innerHTML=[3,5,10,15].map(v=>'<button class="chip'+(F.brk===v?' on':'')+'" data-bl="'+v+'">'+v+' min</button>').join('')};
+const fStart=()=>{F.running=true;F.endAt=Date.now()+F.left*1000;F.pausedByWalk=false;save();fRender()};
+const fPause=()=>{F.left=fLeft();F.running=false;save();fRender()};
+const fSet=(ph,run)=>{F.phase=ph;F.left=fTotal();F.running=false;if(run)fStart();save();fRender()};
+$('fGo').addEventListener('click',()=>{A();F.running?fPause():fStart()});
+$('fReset').addEventListener('click',()=>fSet('focus',false));
+$('fSkip').addEventListener('click',()=>fSet(F.phase==='focus'?'break':'focus',false));
+$('fLen').addEventListener('click',e=>{const b=e.target.closest('[data-fl]');if(!b)return;F.len=+b.dataset.fl;if(F.phase==='focus'&&!F.running)F.left=fTotal();save();fRender()});
+$('bLen').addEventListener('click',e=>{const b=e.target.closest('[data-bl]');if(!b)return;F.brk=+b.dataset.bl;if(F.phase==='break'&&!F.running)F.left=fTotal();save();fRender()});
+$('fDraw').addEventListener('click',()=>{const d=Math.min(F.brk*60,180);resetDraw();drawSrc='focus';go('draw');setDur(d);revealT=setTimeout(()=>charge(),300)});
+$('fWalk').addEventListener('click',()=>go('walk'));
+const fTick=()=>{if(F.running&&fLeft()<=0){buzz([200,100,200]);if(F.phase==='focus'){fSet('break',true);SFX.streak();toast('Break time');lastSession=Date.now()}else{fSet('focus',false);tone(nf(0),0,.3,'triangle',.1);toast('Break over. Ready when you are.')}}if(view==='focus')fRender()};
+
+/* ---------- walk ---------- */
+const W=S.walk;let pIdx=Math.floor(Math.random()*PROMPTS.length),walkBuzzed=false;
+const wRender=()=>{const running=!!W.start;$('wSetup').hidden=running;$('wRun').hidden=!running;
+$('wPrompt').textContent=PROMPTS[pIdx];$('wPrompt').style.opacity=W.promptOff?.35:1;$('wNone').textContent=W.promptOff?'Use prompt':'No prompt';
+$('wLen').innerHTML=[[0,'Open'],[5,'5 min'],[10,'10 min'],[15,'15 min']].map(([v,t])=>'<button class="chip'+(W.len===v?' on':'')+'" data-wl="'+v+'">'+t+'</button>').join('');
+if(running){const el=(Date.now()-W.start)/1000;$('wClock').textContent=fmt(el);$('wNote').textContent=W.len?(el>=W.len*60?'You hit '+W.len+' minutes. Head back whenever.':'Aim for '+W.len+' min'):'No target. Come back when it feels right.'}};
+$('wNext').addEventListener('click',()=>{pIdx=(pIdx+1)%PROMPTS.length;W.promptOff=false;save();wRender();restart($('wPrompt'),'bump')});
+$('wNone').addEventListener('click',()=>{W.promptOff=!W.promptOff;save();wRender()});
+$('wLen').addEventListener('click',e=>{const b=e.target.closest('[data-wl]');if(!b)return;W.len=+b.dataset.wl;save();wRender()});
+$('wStart').addEventListener('click',()=>{A();W.start=Date.now();walkBuzzed=false;$('wResume').hidden=true;if(F.running){fPause();F.pausedByWalk=true}save();wRender();tone(nf(7),0,.2,'triangle',.1)});
+$('wCancel').addEventListener('click',()=>{W.start=0;save();wRender();if(F.pausedByWalk)$('wResume').hidden=false});
+$('wBack').addEventListener('click',()=>{const sec=Math.max(30,(Date.now()-W.start)/1000);W.start=0;const st=addLog('walk',W.promptOff?'Walk':'Walk: '+PROMPTS[pIdx],sec,'','');SFX.done();const [x,y]=centerOf($('wBack'));burst(x,y,30,PAL[0]);toast('Walk logged · '+fmt(sec));save();wRender();if(st)setTimeout(()=>celebrateStreak(st),600);if(F.pausedByWalk)$('wResume').hidden=false});
+$('wResumeGo').addEventListener('click',()=>{$('wResume').hidden=true;if(F.phase==='break')fSet('focus',false);fStart();go('focus')});
+$('wResumeNo').addEventListener('click',()=>{$('wResume').hidden=true;F.pausedByWalk=false;save()});
+
+/* ---------- nudge ---------- */
+let snoozeUntil=0;
+const nudgeCheck=()=>{if(!S.remind||W.start||(F.running&&F.phase==='focus')||Date.now()<snoozeUntil||$('nudge').classList.contains('on'))return;
+const last=Math.max(S.log[0]?.t||0,lastSession);
+if(Date.now()-last>S.remind*3600e3){const n=streakNow(),lit=daySet().has(dayKey(Date.now()));$('nudgeTxt').textContent=(S.remind===1?'An hour':'Two hours')+' without a break.'+(n&&!lit?' Keep your '+n+' day streak going?':' Got 30 seconds?');$('nudge').classList.add('on')}};
+$('nudgeGo').addEventListener('click',()=>{$('nudge').classList.remove('on');snoozeUntil=Date.now()+5*60e3;go('draw')});
+$('nudgeSnooze').addEventListener('click',()=>{$('nudge').classList.remove('on');snoozeUntil=Date.now()+30*60e3});
+
+/* ---------- backup ---------- */
+$('bkCopy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Backup copied')}catch(e){$('bkIn').value=JSON.stringify(S);$('bkIn').select();toast('Select and copy the text')}});
+$('bkLoad').addEventListener('click',()=>{try{const d=JSON.parse($('bkIn').value);if(!Array.isArray(d.log))throw 0;Object.assign(S,d);save();location.reload()}catch(e){toast("That doesn't look like a backup")}});
+
+/* ---------- since last move ---------- */
+let lastSinceT=null;
+const sinceTick=()=>{const k=dayKey(Date.now());let t=0;S.log.forEach(l=>{if(dayKey(l.t)===k&&l.t>t)t=l.t});
+const el=$('since');
+if(!t){el.className='since idle';$('sinceLbl').textContent='Since your last move';$('sinceT').textContent='No moves yet';lastSinceT=null;return}
+if(lastSinceT!==null&&t!==lastSinceT)restart(el,'bump');lastSinceT=t;
+const s=Math.floor((Date.now()-t)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),sec=s%60;
+el.classList.remove('idle');el.classList.toggle('warm',s>=3600);
+$('sinceLbl').textContent='Since your last move';$('sinceT').textContent=h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')};
+
+/* ---------- shine: tilt + touch ---------- */
+const root=document.documentElement,tiltEl=$('tilt');
+let shineRaf=0,sx=.5,sy=.3,tx=.5,ty=.3,lastInput=0;
+const applyShine=()=>{sx+=(tx-sx)*.18;sy+=(ty-sy)*.18;root.style.setProperty('--mx',(sx*100).toFixed(1)+'%');root.style.setProperty('--my',(sy*100).toFixed(1)+'%');root.style.setProperty('--mxn',sx.toFixed(3));
+tiltEl.style.setProperty('--rx',((sx-.5)*14).toFixed(2)+'deg');tiltEl.style.setProperty('--ry',((.5-sy)*14).toFixed(2)+'deg');
+if(Math.abs(tx-sx)>.002||Math.abs(ty-sy)>.002||Date.now()-lastInput<1500)shineRaf=requestAnimationFrame(applyShine);else{shineRaf=0;if(Date.now()-lastInput>4000)document.body.classList.remove('tilting')}};
+const aim=(x,y)=>{tx=Math.min(1,Math.max(0,x));ty=Math.min(1,Math.max(0,y));lastInput=Date.now();document.body.classList.add('tilting');if(!shineRaf&&!RM)shineRaf=requestAnimationFrame(applyShine)};
+const settle=()=>setTimeout(()=>{if(Date.now()-lastInput>=1400){tx=.5;ty=.3;if(!shineRaf)shineRaf=requestAnimationFrame(applyShine)}},1500);
+document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('.cf');if(!c)return;const r=c.getBoundingClientRect();aim((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)},{passive:true});
+document.addEventListener('pointerup',settle);
+let tiltOn=false,base=null;
+const onOrient=e=>{if(e.beta==null)return;if(!base)base={b:e.beta,g:e.gamma};aim(.5+(e.gamma-base.g)/40,.35+(e.beta-base.b)/40)};
+const startTilt=()=>{addEventListener('deviceorientation',onOrient);tiltOn=true;base=null;S.tilt=true;save();$('tiltBtn').textContent='Tilt shine is on. Tap to turn off'};
+const stopTilt=()=>{removeEventListener('deviceorientation',onOrient);tiltOn=false;S.tilt=false;save();$('tiltBtn').textContent='Turn on tilt shine';tx=.5;ty=.3;aim(.5,.3)};
+$('tiltBtn').addEventListener('click',async()=>{if(tiltOn)return stopTilt();
+try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted'){toast('Motion access was declined');return}}startTilt();toast('Tilt your phone over a card')}catch(e){toast("Tilt isn't available here")}});
+if(S.tilt&&!(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'))startTilt();
+else if(S.tilt){$('tiltBtn').textContent='Tap to turn tilt shine back on';S.tilt=false}
+addEventListener('pageshow',()=>{base=null});
+
+/* ---------- optional recorded sounds: drop mp3s in /sounds to replace the synth ---------- */
+const SND={},SND_NAMES=['tap','charge','reveal','reveal-rare','upgrade','done','streak'];
+const loadSounds=async()=>{if(!/^https?:/.test(location.protocol))return;const a=A();if(!a)return;for(const n of SND_NAMES){try{const r=await fetch('sounds/'+n+'.mp3');if(!r.ok)continue;SND[n]=await a.decodeAudioData(await r.arrayBuffer())}catch(e){}}};
+const play=(n,rate)=>{if(S.mute||!SND[n])return false;const a=A();const s=a.createBufferSource();s.buffer=SND[n];s.playbackRate.value=rate||1;s.connect(a.destination);s.start();return true};
+const synth={...SFX};
+SFX.tap=i=>{if(!play('tap',1+Math.min(i,12)*.06))synth.tap(i)};
+SFX.charge=(t,d)=>{if(!play('charge'))synth.charge(t,d)};
+SFX.reveal=t=>{if(!play(t>=2&&SND['reveal-rare']?'reveal-rare':'reveal'))synth.reveal(t)};
+SFX.upgrade=()=>{if(!play('upgrade'))synth.upgrade()};
+SFX.done=()=>{if(!play('done'))synth.done()};
+SFX.streak=()=>{if(!play('streak'))synth.streak()};
+let soundsLoaded=false;document.addEventListener('pointerdown',()=>{if(!soundsLoaded){soundsLoaded=true;loadSounds()}},{once:false,capture:true});
+
+/* ---------- offline app shell ---------- */
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+
+/* ---------- loop ---------- */
+let ticks=0;
+setInterval(()=>{fTick();sinceTick();if(view==='walk'&&W.start)wRender();
+if(W.start&&W.len&&!walkBuzzed&&Date.now()-W.start>=W.len*60e3){walkBuzzed=true;buzz([150,80,150]);SFX.streak()}
+if(mini&&cur){const left=(mini.end-Date.now())/1000;const b=$('bigTxt');if(left<=0){mini=null;buzz([200,100,200]);SFX.reveal(1);setTimerBtn('Time! Tap Done',100);if(b)b.textContent='Time!';const [x,y]=centerOf(tb);burst(x,y,30,PAL[0])}else{setTimerBtn('Stop · '+fmt(left),Math.min(100,(1-left/mini.len)*100));if(b&&cur.kind==='time')b.textContent=fmt(left)}}
+if(++ticks%40===0)nudgeCheck()},250);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){fTick();nudgeCheck();renderTop()}});
+
+if(F.running&&fLeft()<=0)fTick();
+muteIcon();renderTop();sinceTick();fRender();wRender();setKind('time');
+}
+</script>
+</body>
+</html>
